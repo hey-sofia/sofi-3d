@@ -1,18 +1,25 @@
 import "./style.css";
 
 import {
-  WebGLRenderer as threeWebGLRenderer,
+  WebGLRenderer as ThreeRenderer,
   Scene,
   PerspectiveCamera,
   BoxGeometry,
   MeshBasicMaterial,
   Mesh,
+  EdgesGeometry,
+  LineBasicMaterial,
+  LineSegments,
+  TextureLoader,
+  LinearFilter,
+  SRGBColorSpace,
+  ClampToEdgeWrapping,
 } from "three";
 
 import {
   Container,
   Graphics,
-  WebGLRenderer as pixiWebGLRenderer,
+  WebGLRenderer as PixiRenderer,
   Ticker,
 } from "pixi.js";
 
@@ -20,29 +27,53 @@ import {
   const WIDTH = window.innerWidth;
   const HEIGHT = window.innerHeight;
 
-  const threeRenderer = new threeWebGLRenderer({
+  // three.js
+  const three = new ThreeRenderer({
     antialias: true,
     stencil: true, // so masks work in pixijs
   });
 
-  threeRenderer.setSize(WIDTH, HEIGHT);
-  threeRenderer.setClearColor(0xdddddd, 1);
-  document.body.appendChild(threeRenderer.domElement);
+  three.setSize(WIDTH, HEIGHT);
+  three.setClearColor(0xdddddd, 1);
+  document.body.appendChild(three.domElement);
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(70, WIDTH / HEIGHT);
   camera.position.z = 50;
   scene.add(camera);
 
-  const boxGeometry = new BoxGeometry(10, 10, 10);
-  const basicMaterial = new MeshBasicMaterial({ color: 0x0095dd });
-  const cube = new Mesh(boxGeometry, basicMaterial);
-  cube.rotation.set(0.4, 0.2, 0);
+  const cubeGeom = new BoxGeometry(10, 10, 10);
+  const cubeMat = new MeshBasicMaterial({ color: 0x95a4e2 });
+  const cube = new Mesh(cubeGeom, cubeMat);
+
+  const edgesGeometry = new EdgesGeometry(cube.geometry);
+  const edgesMaterial = new LineBasicMaterial({
+    color: 0x546ac1,
+  });
+  const cubeEdges = new LineSegments(edgesGeometry, edgesMaterial);
+  cube.add(cubeEdges);
   scene.add(cube);
 
-  const pixiRenderer = new pixiWebGLRenderer();
-  await pixiRenderer.init({
-    context: threeRenderer.getContext() as WebGL2RenderingContext,
+  const loader = new TextureLoader();
+  loader.load("/assets/sofia-logo.svg", (texture) => {
+    texture.colorSpace = SRGBColorSpace;
+    texture.anisotropy = 8;
+    texture.magFilter = LinearFilter;
+    texture.wrapS = texture.wrapT = ClampToEdgeWrapping;
+
+    const logoMat = new MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+    });
+
+    const logoGeom = new BoxGeometry(10.01, 10.01, 10.01);
+    const logoCube = new Mesh(logoGeom, logoMat);
+    cube.add(logoCube);
+  });
+
+  const pixi = new PixiRenderer();
+  await pixi.init({
+    context: three.getContext() as WebGL2RenderingContext,
     width: WIDTH,
     height: HEIGHT,
     clearBeforeRender: false,
@@ -51,28 +82,22 @@ import {
   const ui = new Graphics()
     .roundRect(20, 80, 100, 100, 5)
     .roundRect(220, 80, 100, 100, 5)
-    .fill(0xffff00);
+    .fill(0x5bcc81);
   stage.addChild(ui);
-
-  function render() {
-    threeRenderer.resetState();
-    threeRenderer.render(scene, camera);
-
-    pixiRenderer.resetState();
-    pixiRenderer.render({ container: stage });
-  }
 
   const ticker = new Ticker();
   ticker.add((t) => {
-    const x = cube.rotation.x;
-    const y = cube.rotation.y;
-    const z = cube.rotation.z;
+    const dt = t.deltaTime / t.FPS;
 
-    const newX = Math.min((x * 1.05) % 10);
-    const newY = Math.min((y * 1.05) % 10);
-    const newZ = Math.min((z * 1.05) % 10);
-    cube.rotation.set(newX, newY, newZ);
-    render();
+    cube.rotation.x += 0.7 * dt;
+    cube.rotation.y += 1.2 * dt;
+
+    // render
+    three.resetState();
+    three.render(scene, camera);
+
+    pixi.resetState();
+    pixi.render({ container: stage });
   });
 
   ticker.start();
